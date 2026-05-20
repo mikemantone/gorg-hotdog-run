@@ -182,8 +182,7 @@ function spawnObstacle() {
     t = OBSTACLE_TYPES[Math.floor(Math.random() * OBSTACLE_TYPES.length)];
   } while (
     t === lastObstacleType ||
-    (t === 'ostrich' && hotdogs < 20) ||
-    (t === 'gorilla' && hotdogs < 40)
+    (t === 'ostrich' && hotdogs < 20)
   );
   lastObstacleType = t;
   let w, h, gy, flying = false, color = null;
@@ -226,7 +225,7 @@ function spawnObstacle() {
     case 'gorilla':
       w=76; h=0; gy=GROUND_Y; break;
   }
-  obstacles.push({ type:t, x:BASE_W+60, w, h, gy, hit:false, t:0, flying, color, gruntTimer:0 });
+  obstacles.push({ type:t, x:BASE_W+60, w, h, gy, hit:false, t:0, flying, color, gruntTimer:0, quackTimer:0 });
 }
 
 function spawnHotdog() {
@@ -500,6 +499,10 @@ function update(dt) {
     if (o.type === 'gorilla') {
       o.gruntTimer += dt;
       if (o.gruntTimer >= 1600) { o.gruntTimer -= 1600; playGrunt(); }
+    }
+    if (o.type === 'ostrich') {
+      o.quackTimer += dt;
+      if (o.quackTimer >= 1200) { o.quackTimer -= 1200; playQuack(); }
     }
     if (!o.hit && rectsOverlap(playerRect(), obstacleRect(o))) {
       killPlayer();
@@ -1716,6 +1719,24 @@ function playGrunt() {
     gain.gain.setValueAtTime(vol,  now);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.45);
     osc.start(now); osc.stop(now + 0.5);
+  });
+}
+
+function playQuack() {
+  const ac  = getAudioCtx();
+  const now = ac.currentTime;
+  // Classic duck quack: short nasal honk with a downward pitch bend
+  [[420, 0.28],[840, 0.10]].forEach(([freq, vol], i) => {
+    const osc  = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.connect(gain); gain.connect(ac.destination);
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(freq * 1.15, now);
+    osc.frequency.linearRampToValueAtTime(freq * 0.75, now + 0.14);
+    gain.gain.setValueAtTime(vol, now);
+    gain.gain.linearRampToValueAtTime(vol * 0.6, now + 0.09);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+    osc.start(now); osc.stop(now + 0.2);
   });
 }
 
