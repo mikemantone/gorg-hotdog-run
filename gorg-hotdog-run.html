@@ -162,16 +162,15 @@ let bgTrees     = [];
 // Tube colour palette – vivid, none close to the pool blue/cyan water
 const TUBE_COLORS = ['#FF5252', '#FF9800', '#FFD600', '#E040FB', '#76FF03'];
 
-// Obstacle types: pool obstacles + flying ostrich
-const POOL_OBSTACLE_TYPES    = ['tube','noodle','tallNoodle','twinNoodle','bigTube','ball','lounger','raccoonBoat'];
-const FLYING_OBSTACLE_TYPES  = ['ostrich'];
-// Pool ×4, ostrich ×1
+// Obstacle types — common pool ×4, rare types ×1 each (gated by hotdog count)
+const POOL_OBSTACLE_TYPES = ['tube','noodle','tallNoodle','twinNoodle','bigTube','ball','lounger'];
 const OBSTACLE_TYPES = [
   ...POOL_OBSTACLE_TYPES,
   ...POOL_OBSTACLE_TYPES,
   ...POOL_OBSTACLE_TYPES,
   ...POOL_OBSTACLE_TYPES,
-  ...FLYING_OBSTACLE_TYPES,
+  'ostrich',       // rare — unlocks at 10 hotdogs
+  'raccoonBoat',   // rare — unlocks at 20 hotdogs
 ];
 
 function spawnObstacle() {
@@ -180,7 +179,8 @@ function spawnObstacle() {
     t = OBSTACLE_TYPES[Math.floor(Math.random() * OBSTACLE_TYPES.length)];
   } while (
     t === lastObstacleType ||
-    (t === 'ostrich' && hotdogs < 20)
+    (t === 'ostrich'      && hotdogs < 10) ||
+    (t === 'raccoonBoat'  && hotdogs < 20)
   );
   lastObstacleType = t;
   let w, h, gy, flying = false, color = null;
