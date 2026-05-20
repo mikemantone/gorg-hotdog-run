@@ -215,7 +215,7 @@ function spawnObstacle() {
     case 'raccoonBoat': {
       const boatDepths = [GROUND_Y, GROUND_Y + 10, GROUND_Y + 20, GROUND_Y + 30];
       gy = boatDepths[Math.floor(Math.random() * boatDepths.length)];
-      w = 96; h = 0; break;
+      w = 192; h = 0; break;
     }
     case 'ostrich': {
       const skyHeights = [
@@ -884,6 +884,7 @@ function drawRaccoonRowboat(x, gy, w, t) {
   ctx.save();
   ctx.translate(cx, by);
   ctx.rotate(tilt);
+  ctx.scale(2, 2);
 
   // ── Pointed hull (canoe-style) ──
   // Hull fill — pointed bow & stern, shallow depth
