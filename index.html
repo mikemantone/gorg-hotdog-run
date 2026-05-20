@@ -1565,7 +1565,12 @@ function startMusic() {
 
 function stopMusic() {
   musicActive = false;
-  musicGeneration++; // invalidates any pending setTimeout callbacks
+  musicGeneration++;
+  // Close the audio context to instantly cancel all pre-scheduled notes
+  if (audioCtx) {
+    audioCtx.close();
+    audioCtx = null;
+  }
 }
 
 function playReee() {
