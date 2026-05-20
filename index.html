@@ -1395,10 +1395,46 @@ function drawDeathScreen() {
   ctx.font        = '14px Arial';
   ctx.fillText(`Best: ${highHotdogs} hotdogs · ${highScore} pts`, BASE_W/2, BASE_H/2 + 10);
 
-  const msg = hotdogs === 0 ? "No hotdogs?! Gørg is devastated. 😭"
-            : hotdogs < 5  ? "A few hotdogs saved! The party lives. 🎉"
-            : hotdogs < 10 ? "Solid haul! The grill is fired up! 🔥"
-                           : "LEGENDARY! Gørg feeds the whole block! 🏆";
+  const DEATH_MSGS = [
+    [144, "Gørg has broken space and time. The pool party will never end. It has always been happening. 🌭🌭🌭"],
+    [140, "Pope John Paul II appeared briefly in the pool steam and gave a thumbs up."],
+    [136, "The UN has convened an emergency session. Gørg did not attend. He was grilling."],
+    [132, "Gørg has fused with the grill. He IS the grill now. 🔥"],
+    [128, "Scientists cannot explain what is happening at this pool."],
+    [124, "The mayor has declared a municipal hotdog emergency."],
+    [120, "Gørg has been reported missing. He was at the grill."],
+    [116, "A statue is being erected in the pool. 🏆"],
+    [112, "Gørg cannot be stopped. He will not be stopped."],
+    [108, "They're writing songs about this cookout."],
+    [104, "Gørg has achieved pool party immortality. 🎆"],
+    [100, "Gørg's arms are 40% mustard by now."],
+    [96,  "The pool is basically a hot tub of glory."],
+    [92,  "Great Scott, that's a lot of dogs. 🔥🔥"],
+    [88,  "National hotdog shortage reported. Probably unrelated."],
+    [84,  "Gørg has transcended the mortal grill. ✨"],
+    [80,  "The fire department showed up. They stayed for the food."],
+    [76,  "Gørg is a legend in his own pool. 🏊"],
+    [72,  "Local grocery stores are running low on buns."],
+    [68,  "People are driving in from out of town."],
+    [64,  "Gørg is a hotdog deity. 🌭"],
+    [60,  "Word has spread to the next neighborhood."],
+    [56,  "LEGENDARY! Gørg feeds the whole block! 🏆"],
+    [52,  "This is no longer just a party — it's an event."],
+    [48,  "The grill has been lit for three hours. Worth it."],
+    [44,  'Someone called it a "vibe." They\'re right.'],
+    [40,  "The pool floaties are earning their keep."],
+    [36,  "Gørg is running on pure mustard energy."],
+    [32,  "This cookout just got serious."],
+    [28,  "Solid haul! The grill is fired up! 🔥"],
+    [24,  "The neighbors are starting to sniff around."],
+    [20,  "The cooler is officially worth it."],
+    [16,  "Gørg found his groove. 🕺"],
+    [12,  "Someone dusted off the lawn chairs."],
+    [8,   "The party is off life support."],
+    [4,   "A few hotdogs saved! The party lives. 🎉"],
+    [0,   "No hotdogs?! Gørg is devastated. 😭"],
+  ];
+  const msg = (DEATH_MSGS.find(([min]) => hotdogs >= min) || DEATH_MSGS[DEATH_MSGS.length - 1])[1];
   ctx.fillStyle = '#ffffff';
   ctx.font      = '15px Arial';
   ctx.fillText(msg, BASE_W/2, BASE_H/2 + 38);
