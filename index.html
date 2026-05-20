@@ -206,6 +206,7 @@ function spawnObstacle() {
     case 'lounger': {
       const loungerDepths = [GROUND_Y, GROUND_Y + 12, GROUND_Y + 24, GROUND_Y + 36];
       gy = loungerDepths[Math.floor(Math.random() * loungerDepths.length)];
+      color = TUBE_COLORS[Math.floor(Math.random() * TUBE_COLORS.length)];
       w = 112; h = 0; break;
     }
     case 'ostrich': {
@@ -709,7 +710,7 @@ function drawObstacle(o) {
       drawBeachBall(o.x, o.gy, o.w, o.h, o.t);
       break;
     case 'lounger':
-      drawPoolLounger(o.x, o.gy, o.w, o.t);
+      drawPoolLounger(o.x, o.gy, o.w, o.t, o.color || '#FF5252');
       break;
     case 'ostrich':
       drawOstrich(o.x, o.gy, o.w, o.t);
@@ -852,17 +853,20 @@ function drawBeachBall(x, bot, w, h, t) {
 }
 
 // Inflatable pool lounger – wide floatie resting on the water surface
-function drawPoolLounger(x, gy, w, t) {
-  const bob = Math.sin(t * 0.0014) * 2.5;
-  const y   = gy + bob;
+function drawPoolLounger(x, gy, w, t, color) {
+  const bob      = Math.sin(t * 0.0014) * 2.5;
+  const y        = gy + bob;
+  const cLight   = shadeColor(color, 50);
+  const cDark    = shadeColor(color, -55);
+  const cMid     = shadeColor(color, 20);
 
   ctx.save();
 
   // ── Main body ──
   const bodyGrad = ctx.createLinearGradient(x, y - 18, x, y + 10);
-  bodyGrad.addColorStop(0, '#4DD0E1');
-  bodyGrad.addColorStop(0.5, '#00ACC1');
-  bodyGrad.addColorStop(1, '#00838F');
+  bodyGrad.addColorStop(0,   cLight);
+  bodyGrad.addColorStop(0.5, color);
+  bodyGrad.addColorStop(1,   cDark);
   ctx.fillStyle = bodyGrad;
   roundRect(x + 6, y - 16, w - 12, 22, 9);
   ctx.fill();
@@ -884,20 +888,20 @@ function drawPoolLounger(x, gy, w, t) {
   ctx.restore();
 
   // Outer rim stroke
-  ctx.strokeStyle = '#006064';
+  ctx.strokeStyle = cDark;
   ctx.lineWidth   = 2.5;
   roundRect(x + 6, y - 16, w - 12, 22, 9);
   ctx.stroke();
 
   // ── Headrest bump (right end) ──
   const hGrad = ctx.createRadialGradient(x+w-18, y-22, 2, x+w-18, y-20, 16);
-  hGrad.addColorStop(0, '#80DEEA');
-  hGrad.addColorStop(1, '#00ACC1');
+  hGrad.addColorStop(0, cLight);
+  hGrad.addColorStop(1, color);
   ctx.fillStyle = hGrad;
   ctx.beginPath();
   ctx.ellipse(x + w - 18, y - 21, 16, 11, 0, 0, Math.PI*2);
   ctx.fill();
-  ctx.strokeStyle = '#006064';
+  ctx.strokeStyle = cDark;
   ctx.lineWidth   = 2;
   ctx.beginPath();
   ctx.ellipse(x + w - 18, y - 21, 16, 11, 0, 0, Math.PI*2);
@@ -905,11 +909,11 @@ function drawPoolLounger(x, gy, w, t) {
 
   // ── Armrest bumps ──
   [x + w*0.28, x + w*0.68].forEach(ax => {
-    ctx.fillStyle = '#00BCD4';
+    ctx.fillStyle = cMid;
     ctx.beginPath();
     ctx.ellipse(ax, y - 19, 12, 7, 0, 0, Math.PI*2);
     ctx.fill();
-    ctx.strokeStyle = '#006064';
+    ctx.strokeStyle = cDark;
     ctx.lineWidth   = 1.5;
     ctx.beginPath();
     ctx.ellipse(ax, y - 19, 12, 7, 0, 0, Math.PI*2);
@@ -917,11 +921,11 @@ function drawPoolLounger(x, gy, w, t) {
   });
 
   // ── Cup holder detail ──
-  ctx.fillStyle = '#006064';
+  ctx.fillStyle = cDark;
   ctx.beginPath();
   ctx.arc(x + 28, y - 7, 5, 0, Math.PI*2);
   ctx.fill();
-  ctx.fillStyle = '#80DEEA';
+  ctx.fillStyle = cLight;
   ctx.beginPath();
   ctx.arc(x + 28, y - 7, 3, 0, Math.PI*2);
   ctx.fill();
