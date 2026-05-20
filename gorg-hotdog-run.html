@@ -132,6 +132,7 @@ let highHotdogs = 0;
 let comboCount  = 0;
 let comboTimer  = 0;
 let screenShake = 0;
+let lastObstacleType = null;
 
 // ─── PLAYER ────────────────────────────────────────────────────────────────────
 const player = {
@@ -171,7 +172,11 @@ const OBSTACLE_TYPES = [
 ];
 
 function spawnObstacle() {
-  const t = OBSTACLE_TYPES[Math.floor(Math.random() * OBSTACLE_TYPES.length)];
+  let t;
+  do {
+    t = OBSTACLE_TYPES[Math.floor(Math.random() * OBSTACLE_TYPES.length)];
+  } while (t === lastObstacleType);
+  lastObstacleType = t;
   let w, h, gy, flying = false;
   switch(t) {
     // h = how far above the waterline the pool obstacle protrudes.
@@ -181,7 +186,11 @@ function spawnObstacle() {
     case 'twinNoodle':w=64;  h=36; gy=GROUND_Y; break;
     case 'bigTube':   w=80;  h=0;  gy=GROUND_Y; break;
     case 'ball':      w=44;  h=0;  gy=GROUND_Y; break;
-    case 'lounger':   w=112; h=0;  gy=GROUND_Y; break;
+    case 'lounger': {
+      const loungerDepths = [GROUND_Y, GROUND_Y + 12, GROUND_Y + 24, GROUND_Y + 36];
+      gy = loungerDepths[Math.floor(Math.random() * loungerDepths.length)];
+      w = 112; h = 0; break;
+    }
     case 'ostrich': {
       // Flies at one of three sky heights — threatens Gørg while airborne
       const skyHeights = [GROUND_Y - 72, GROUND_Y - 112, GROUND_Y - 158];
@@ -198,17 +207,14 @@ function spawnHotdog() {
     GROUND_Y - 120, GROUND_Y - 80, GROUND_Y - 40, GROUND_Y - 10,
     GROUND_Y + 14, GROUND_Y + 30,
   ];
-  // Spawn 3 hotdogs per call in a loose cluster (tripled density)
-  for(let i = 0; i < 3; i++) {
-    const yy = heights[Math.floor(Math.random() * heights.length)];
-    hotdogItems.push({
-      x: BASE_W + 20 + i * 58,
-      y: yy,
-      collected: false,
-      bobOffset: Math.random() * Math.PI * 2,
-      floatT: 0,
-    });
-  }
+  const yy = heights[Math.floor(Math.random() * heights.length)];
+  hotdogItems.push({
+    x: BASE_W + 20,
+    y: yy,
+    collected: false,
+    bobOffset: Math.random() * Math.PI * 2,
+    floatT: 0,
+  });
 }
 
 function spawnCloud() {
@@ -232,7 +238,7 @@ for(let i=0;i<5;i++) bgTrees.push({x:60+i*160,y:GROUND_Y-2,size:24+Math.random()
 let obstacleTimer = 0;
 let obstacleGap   = 1800;   // ms between obstacles (decreases with speed)
 let hotdogTimer   = 0;
-let hotdogGap     = 2200;
+let hotdogGap     = 800;
 let cloudTimer    = 0;
 let treeTimer     = 0;
 
@@ -291,9 +297,10 @@ function startGame() {
   obstacles   = [];
   hotdogItems = [];
   particles   = [];
-  comboCount  = 0;
-  comboTimer  = 0;
-  isHolding   = false;
+  comboCount       = 0;
+  comboTimer       = 0;
+  isHolding        = false;
+  lastObstacleType = null;
 
   player.y        = GROUND_Y;
   player.vy       = 0;
@@ -413,7 +420,7 @@ function update(dt) {
     spawnObstacle();
     obstacleTimer = spawnGap + (Math.random()-0.5)*300;
   }
-  const hdGap = Math.max(1200, 2200 - (elapsed*0.1));
+  const hdGap = Math.max(500, 800 - (elapsed * 0.04));
   if (hotdogTimer <= 0) {
     spawnHotdog();
     hotdogTimer = hdGap + (Math.random()-0.5)*400;
