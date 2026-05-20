@@ -180,12 +180,24 @@ function spawnObstacle() {
   let w, h, gy, flying = false;
   switch(t) {
     // h = how far above the waterline the pool obstacle protrudes.
-    case 'tube':      w=62;  h=0;  gy=GROUND_Y; break;
+    case 'tube': {
+      const tubeDepths = [GROUND_Y, GROUND_Y + 14, GROUND_Y + 28];
+      gy = tubeDepths[Math.floor(Math.random() * tubeDepths.length)];
+      w = 62; h = 0; break;
+    }
     case 'noodle':    w=26;  h=26; gy=GROUND_Y; break;
     case 'tallNoodle':w=26;  h=58; gy=GROUND_Y; break;
     case 'twinNoodle':w=64;  h=36; gy=GROUND_Y; break;
-    case 'bigTube':   w=80;  h=0;  gy=GROUND_Y; break;
-    case 'ball':      w=44;  h=0;  gy=GROUND_Y; break;
+    case 'bigTube': {
+      const bigTubeDepths = [GROUND_Y, GROUND_Y + 14, GROUND_Y + 28];
+      gy = bigTubeDepths[Math.floor(Math.random() * bigTubeDepths.length)];
+      w = 80; h = 0; break;
+    }
+    case 'ball': {
+      const ballDepths = [GROUND_Y, GROUND_Y + 12, GROUND_Y + 24];
+      gy = ballDepths[Math.floor(Math.random() * ballDepths.length)];
+      w = 44; h = 0; break;
+    }
     case 'lounger': {
       const loungerDepths = [GROUND_Y, GROUND_Y + 12, GROUND_Y + 24, GROUND_Y + 36];
       gy = loungerDepths[Math.floor(Math.random() * loungerDepths.length)];
@@ -415,7 +427,7 @@ function update(dt) {
   comboTimer    -= dt;
   if (comboTimer <= 0) comboCount = 0;
 
-  const spawnGap = Math.max(900, 1800 - (elapsed * 0.15));
+  const spawnGap = Math.max(1170, 2340 - (elapsed * 0.195));
   if (obstacleTimer <= 0) {
     spawnObstacle();
     obstacleTimer = spawnGap + (Math.random()-0.5)*300;
