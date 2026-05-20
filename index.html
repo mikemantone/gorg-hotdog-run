@@ -1623,35 +1623,27 @@ function playChomp() {
 function playReee() {
   const ac  = getAudioCtx();
   const now = ac.currentTime;
-  const dur = 1.3;
-
-  // Three detuned sawtooth oscillators + vibrato each = raw screech voice
-  function makeScreech(freq, vol) {
-    const osc     = ac.createOscillator();
-    const gain    = ac.createGain();
-    const lfo     = ac.createOscillator();
-    const lfoGain = ac.createGain();
-    lfo.frequency.value = 7;          // 7 Hz vibrato rate
-    lfoGain.gain.value  = 22;         // ±22 Hz pitch wobble
-    lfo.connect(lfoGain);
-    lfoGain.connect(osc.frequency);
-    osc.connect(gain);
-    gain.connect(ac.destination);
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(freq * 0.5, now);          // start low
-    osc.frequency.linearRampToValueAtTime(freq,      now + 0.12); // screech up
-    osc.frequency.linearRampToValueAtTime(freq * 0.88, now + dur); // drift down
-    gain.gain.setValueAtTime(0,   now);
-    gain.gain.linearRampToValueAtTime(vol, now + 0.1);
-    gain.gain.setValueAtTime(vol, now + dur - 0.28);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
-    lfo.start(now); lfo.stop(now + dur + 0.05);
-    osc.start(now); osc.stop(now + dur + 0.05);
+  const osc  = ac.createOscillator();
+  const gain = ac.createGain();
+  osc.connect(gain);
+  gain.connect(ac.destination);
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(600,  now);
+  osc.frequency.linearRampToValueAtTime(1500, now + 0.1);
+  osc.frequency.linearRampToValueAtTime(900,  now + 0.35);
+  osc.frequency.linearRampToValueAtTime(500,  now + 0.55);
+  gain.gain.setValueAtTime(0.28, now);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.58);
+  osc.start(now);
+  osc.stop(now + 0.6);
+  if (window.speechSynthesis) {
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance('RRREEEEEEEEEEEEEEEE');
+    u.pitch  = 2;
+    u.rate   = 2;
+    u.volume = 0.9;
+    speechSynthesis.speak(u);
   }
-
-  makeScreech(880,  0.22);  // root
-  makeScreech(887,  0.18);  // slight detune for rawness
-  makeScreech(1760, 0.07);  // octave harmonic
 }
 
 // ─── MAIN LOOP ─────────────────────────────────────────────────────────────────
