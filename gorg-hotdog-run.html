@@ -333,6 +333,8 @@ function startGame() {
   hotdogTimer   = 1500;
   cloudTimer    = 3000;
   treeTimer     = 1200;
+
+  startMusic();
 }
 
 function killPlayer() {
@@ -344,6 +346,8 @@ function killPlayer() {
   if (hotdogs > highHotdogs) highHotdogs = hotdogs;
   if (score   > highScore)   highScore   = score;
   spawnDeathParticles();
+  stopMusic();
+  playReee();
 }
 
 // ─── PARTICLES ─────────────────────────────────────────────────────────────────
@@ -1487,6 +1491,106 @@ function render() {
   // Overlays
   if (state === 'start') { drawBackground(); drawGorg(); drawStartScreen(); }
   if (state === 'dead')  drawDeathScreen();
+}
+
+// ─── AUDIO ─────────────────────────────────────────────────────────────────────
+let audioCtx    = null;
+let musicActive = false;
+
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+// Tropical 8-bit loop — 8 bars, C major
+const MELODY_SEQ = [
+  [659,250],[784,250],[659,250],[587,250],  // bar 1
+  [523,250],[659,250],[523,500],            // bar 2
+  [784,250],[659,250],[587,250],[523,250],  // bar 3
+  [440,1000],                              // bar 4
+  [784,250],[880,250],[784,250],[659,250],  // bar 5
+  [587,250],[659,250],[784,500],           // bar 6
+  [523,250],[587,250],[659,250],[784,250], // bar 7
+  [659,1000],                             // bar 8
+];
+
+const BASS_SEQ = [
+  [262,500],[392,500],[262,500],[392,500],
+  [262,500],[392,500],[262,500],[392,500],
+  [262,500],[392,500],[262,500],[392,500],
+  [262,500],[392,500],[262,500],[392,500],
+];
+
+function schedNote(freq, t0, durSec, type, vol) {
+  const ac   = audioCtx;
+  const osc  = ac.createOscillator();
+  const gain = ac.createGain();
+  osc.connect(gain);
+  gain.connect(ac.destination);
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, t0);
+  gain.gain.setValueAtTime(vol, t0);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + durSec * 0.85);
+  osc.start(t0);
+  osc.stop(t0 + durSec);
+}
+
+function scheduleMusicLoop() {
+  if (!musicActive) return;
+  const ac = getAudioCtx();
+  let   t  = ac.currentTime + 0.05;
+
+  for (const [freq, ms] of MELODY_SEQ) {
+    schedNote(freq, t, ms / 1000 * 0.9, 'square', 0.09);
+    t += ms / 1000;
+  }
+  let bt = ac.currentTime + 0.05;
+  for (const [freq, ms] of BASS_SEQ) {
+    schedNote(freq, bt, ms / 1000 * 0.7, 'square', 0.06);
+    bt += ms / 1000;
+  }
+
+  const loopMs = MELODY_SEQ.reduce((s,[,ms]) => s + ms, 0);
+  setTimeout(scheduleMusicLoop, loopMs - 80);
+}
+
+function startMusic() {
+  if (musicActive) return;
+  musicActive = true;
+  scheduleMusicLoop();
+}
+
+function stopMusic() {
+  musicActive = false;
+}
+
+function playReee() {
+  const ac  = getAudioCtx();
+  const now = ac.currentTime;
+  // Pitched shriek with Web Audio
+  const osc  = ac.createOscillator();
+  const gain = ac.createGain();
+  osc.connect(gain);
+  gain.connect(ac.destination);
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(600,  now);
+  osc.frequency.linearRampToValueAtTime(1500, now + 0.1);
+  osc.frequency.linearRampToValueAtTime(900,  now + 0.35);
+  osc.frequency.linearRampToValueAtTime(500,  now + 0.55);
+  gain.gain.setValueAtTime(0.28, now);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.58);
+  osc.start(now);
+  osc.stop(now + 0.6);
+  // Voice layer via speech synthesis
+  if (window.speechSynthesis) {
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance('REEEE');
+    u.pitch  = 2;
+    u.rate   = 2;
+    u.volume = 0.9;
+    speechSynthesis.speak(u);
+  }
 }
 
 // ─── MAIN LOOP ─────────────────────────────────────────────────────────────────
