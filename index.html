@@ -12,7 +12,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      height: 100dvh;
+      height: 100vh;
       font-family: 'Arial Black', Arial, sans-serif;
     }
     #game-wrap {
@@ -72,25 +72,12 @@
 const canvas = document.getElementById('c');
 const ctx    = canvas.getContext('2d');
 
-let BASE_W = 800;
-let BASE_H = 450;
-let GROUND_Y = BASE_H - 80;
+const BASE_W = 800;
+const BASE_H = 450;
 
 const BTN_H = 78; // jump button area height in CSS pixels
 
 function resize() {
-  const isPortrait = window.innerHeight > window.innerWidth;
-  const newW = isPortrait ? 450 : 800;
-  const newH = isPortrait ? 700 : 450;
-
-  if (newW !== BASE_W || newH !== BASE_H) {
-    BASE_W   = newW;
-    BASE_H   = newH;
-    GROUND_Y = BASE_H - 80;
-    // Reset to start screen if a game is in progress so nothing breaks
-    if (typeof state !== 'undefined' && state === 'playing') state = 'start';
-  }
-
   const scaleX = window.innerWidth  / BASE_W;
   const scaleY = (window.innerHeight - BTN_H) / BASE_H;
   const scale  = Math.min(scaleX, scaleY);
@@ -103,7 +90,7 @@ resize();
 window.addEventListener('resize', resize);
 
 // ─── CONSTANTS ─────────────────────────────────────────────────────────────────
-// GROUND_Y is set dynamically in resize() based on orientation
+const GROUND_Y   = BASE_H - 80;
 const GRAVITY    = 0.55;
 const JUMP_MIN   = -10;          // base jump on press
 const JUMP_MAX   = -15;          // not used for charge; kept for boost ceiling
