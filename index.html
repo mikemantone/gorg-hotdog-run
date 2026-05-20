@@ -1494,8 +1494,9 @@ function render() {
 }
 
 // ─── AUDIO ─────────────────────────────────────────────────────────────────────
-let audioCtx    = null;
-let musicActive = false;
+let audioCtx       = null;
+let musicActive    = false;
+let musicGeneration = 0; // incremented on every start/stop to cancel stale timeouts
 
 function getAudioCtx() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -1536,8 +1537,8 @@ function schedNote(freq, t0, durSec, type, vol) {
   osc.stop(t0 + durSec);
 }
 
-function scheduleMusicLoop() {
-  if (!musicActive) return;
+function scheduleMusicLoop(gen) {
+  if (!musicActive || gen !== musicGeneration) return;
   const ac = getAudioCtx();
   let   t  = ac.currentTime + 0.05;
 
@@ -1552,17 +1553,19 @@ function scheduleMusicLoop() {
   }
 
   const loopMs = MELODY_SEQ.reduce((s,[,ms]) => s + ms, 0);
-  setTimeout(scheduleMusicLoop, loopMs - 80);
+  setTimeout(() => scheduleMusicLoop(gen), loopMs - 80);
 }
 
 function startMusic() {
   if (musicActive) return;
   musicActive = true;
-  scheduleMusicLoop();
+  musicGeneration++;
+  scheduleMusicLoop(musicGeneration);
 }
 
 function stopMusic() {
   musicActive = false;
+  musicGeneration++; // invalidates any pending setTimeout callbacks
 }
 
 function playReee() {
