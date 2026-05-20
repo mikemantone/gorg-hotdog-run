@@ -1575,36 +1575,17 @@ function stopMusic() {
 }
 
 function playChomp() {
-  const ac  = getAudioCtx();
-  const now = ac.currentTime;
-
-  // "Ch" — short filtered noise burst
-  const bufLen = Math.floor(ac.sampleRate * 0.07);
-  const buf    = ac.createBuffer(1, bufLen, ac.sampleRate);
-  const data   = buf.getChannelData(0);
-  for (let i = 0; i < bufLen; i++) data[i] = Math.random() * 2 - 1;
-  const noise  = ac.createBufferSource();
-  noise.buffer = buf;
-  const bpf    = ac.createBiquadFilter();
-  bpf.type     = 'bandpass';
-  bpf.frequency.value = 1400;
-  bpf.Q.value  = 0.6;
-  const nGain  = ac.createGain();
-  nGain.gain.setValueAtTime(0.35, now);
-  nGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.07);
-  noise.connect(bpf); bpf.connect(nGain); nGain.connect(ac.destination);
-  noise.start(now); noise.stop(now + 0.07);
-
-  // "Omp" — descending sine thump
-  const osc   = ac.createOscillator();
-  const oGain = ac.createGain();
-  osc.connect(oGain); oGain.connect(ac.destination);
-  osc.type = 'sine';
-  osc.frequency.setValueAtTime(320, now + 0.02);
-  osc.frequency.exponentialRampToValueAtTime(80, now + 0.18);
-  oGain.gain.setValueAtTime(0.45, now + 0.02);
-  oGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
-  osc.start(now + 0.02); osc.stop(now + 0.22);
+  if (!window.speechSynthesis) return;
+  const u    = new SpeechSynthesisUtterance('CHOMP');
+  u.pitch    = 0.5;   // low/male
+  u.rate     = 1.2;
+  u.volume   = 1.0;
+  // Pick a male voice if available
+  const voices = speechSynthesis.getVoices();
+  const male   = voices.find(v => /male/i.test(v.name)) ||
+                 voices.find(v => /david|alex|fred|daniel|jorge|thomas/i.test(v.name));
+  if (male) u.voice = male;
+  speechSynthesis.speak(u);
 }
 
 function playReee() {
