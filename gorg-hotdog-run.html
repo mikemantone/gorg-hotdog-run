@@ -165,15 +165,13 @@ const TUBE_COLORS = ['#FF5252', '#FF9800', '#FFD600', '#E040FB', '#76FF03'];
 // Obstacle types: pool obstacles + flying ostrich
 const POOL_OBSTACLE_TYPES    = ['tube','noodle','tallNoodle','twinNoodle','bigTube','ball','lounger'];
 const FLYING_OBSTACLE_TYPES  = ['ostrich'];
-const RARE_OBSTACLE_TYPES    = ['gorilla'];
-// Pool ×4, ostrich ×1, gorilla ×1 — rare types gated by hotdog count in spawnObstacle
+// Pool ×4, ostrich ×1
 const OBSTACLE_TYPES = [
   ...POOL_OBSTACLE_TYPES,
   ...POOL_OBSTACLE_TYPES,
   ...POOL_OBSTACLE_TYPES,
   ...POOL_OBSTACLE_TYPES,
   ...FLYING_OBSTACLE_TYPES,
-  ...RARE_OBSTACLE_TYPES,
 ];
 
 function spawnObstacle() {
@@ -222,10 +220,8 @@ function spawnObstacle() {
       gy = skyHeights[Math.floor(Math.random() * skyHeights.length)];
       w=66; h=52; flying=true; break;
     }
-    case 'gorilla':
-      w=76; h=0; gy=GROUND_Y; break;
   }
-  obstacles.push({ type:t, x:BASE_W+60, w, h, gy, hit:false, t:0, flying, color, gruntTimer:0, quackTimer:0 });
+  obstacles.push({ type:t, x:BASE_W+60, w, h, gy, hit:false, t:0, flying, color, quackTimer:0 });
 }
 
 function spawnHotdog() {
@@ -496,10 +492,6 @@ function update(dt) {
     o.x -= speed;
     o.t  += dt;
     if (o.x + o.w < -20) { obstacles.splice(i,1); continue; }
-    if (o.type === 'gorilla') {
-      o.gruntTimer += dt;
-      if (o.gruntTimer >= 1600) { o.gruntTimer -= 1600; playGrunt(); }
-    }
     if (o.type === 'ostrich') {
       o.quackTimer += dt;
       if (o.quackTimer >= 1200) { o.quackTimer -= 1200; playQuack(); }
@@ -736,9 +728,6 @@ function drawObstacle(o) {
       break;
     case 'ostrich':
       drawOstrich(o.x, o.gy, o.w, o.t);
-      break;
-    case 'gorilla':
-      drawGorilla(o.x, o.gy, o.w, o.t);
       break;
   }
   ctx.restore();
@@ -1080,116 +1069,6 @@ function drawOstrich(x, gy, w, t) {
   ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(3, 22); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(3,22); ctx.lineTo(9,27); ctx.stroke();
   ctx.restore();
-
-  ctx.restore();
-}
-
-// Gorilla – angry pool-goer in a bathing suit, waving arms
-function drawGorilla(x, gy, w, t) {
-  const cx      = x + w / 2;
-  const armWave = Math.sin(t * 0.006) * 30;
-  const FUR     = '#111111';   // black fur
-  const FUR2    = '#1e1e1e';   // slightly lighter for depth
-  const SNOUT   = '#b8b8b8';   // light gray muzzle
-
-  ctx.save();
-
-  // ── Short bowed legs ──
-  // Left leg: bows outward to the left
-  ctx.strokeStyle = FUR; ctx.lineWidth = 13; ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(cx - 8, gy - 22);
-  ctx.quadraticCurveTo(cx - 22, gy - 10, cx - 14, gy + 8);
-  ctx.stroke();
-  // Right leg: bows outward to the right
-  ctx.beginPath();
-  ctx.moveTo(cx + 8, gy - 22);
-  ctx.quadraticCurveTo(cx + 22, gy - 10, cx + 14, gy + 8);
-  ctx.stroke();
-  // Feet
-  ctx.fillStyle = FUR;
-  ctx.beginPath(); ctx.ellipse(cx - 14, gy + 10, 9, 5, -0.2, 0, Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(cx + 14, gy + 10, 9, 5,  0.2, 0, Math.PI*2); ctx.fill();
-
-  // ── Swim trunks ──
-  const tg = ctx.createLinearGradient(cx - 18, gy - 42, cx + 18, gy - 42);
-  tg.addColorStop(0, '#FF5252'); tg.addColorStop(0.5, '#FF8A65'); tg.addColorStop(1, '#FF5252');
-  ctx.fillStyle = tg;
-  roundRect(cx - 20, gy - 46, 40, 26, 6); ctx.fill();
-  ctx.save();
-  ctx.beginPath(); roundRect(cx - 20, gy - 46, 40, 26, 6); ctx.clip();
-  ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 3;
-  [gy-39, gy-32, gy-25].forEach(yy => {
-    ctx.beginPath(); ctx.moveTo(cx-20, yy); ctx.lineTo(cx+20, yy); ctx.stroke();
-  });
-  ctx.restore();
-
-  // ── Big round belly (torso) ──
-  const bg = ctx.createRadialGradient(cx - 6, gy - 66, 5, cx, gy - 62, 28);
-  bg.addColorStop(0, FUR2); bg.addColorStop(1, FUR);
-  ctx.fillStyle = bg;
-  // Wider, taller ellipse for prominent belly
-  ctx.beginPath(); ctx.ellipse(cx, gy - 62, 26, 26, 0, 0, Math.PI*2); ctx.fill();
-  // Belly bulge — lighter center circle
-  ctx.fillStyle = 'rgba(40,40,40,0.55)';
-  ctx.beginPath(); ctx.ellipse(cx + 2, gy - 58, 14, 16, 0.1, 0, Math.PI*2); ctx.fill();
-
-  // ── Left arm (raised, waving) ──
-  ctx.save();
-  ctx.translate(cx - 23, gy - 74);
-  ctx.rotate((-110 + armWave) * Math.PI / 180);
-  ctx.strokeStyle = FUR; ctx.lineWidth = 13; ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -28); ctx.stroke();
-  ctx.fillStyle = FUR2; ctx.beginPath(); ctx.arc(0, -30, 9, 0, Math.PI*2); ctx.fill();
-  ctx.restore();
-
-  // ── Right arm (raised, waving) ──
-  ctx.save();
-  ctx.translate(cx + 23, gy - 74);
-  ctx.rotate((110 - armWave) * Math.PI / 180);
-  ctx.strokeStyle = FUR; ctx.lineWidth = 13; ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -28); ctx.stroke();
-  ctx.fillStyle = FUR2; ctx.beginPath(); ctx.arc(0, -30, 9, 0, Math.PI*2); ctx.fill();
-  ctx.restore();
-
-  // ── Head ──
-  ctx.fillStyle = FUR;
-  ctx.beginPath(); ctx.ellipse(cx, gy - 94, 19, 18, 0, 0, Math.PI*2); ctx.fill();
-  // Sagittal crest (top of skull ridge)
-  ctx.beginPath();
-  ctx.moveTo(cx - 9, gy - 108);
-  ctx.quadraticCurveTo(cx, gy - 118, cx + 9, gy - 108);
-  ctx.closePath(); ctx.fill();
-  // Heavy brow ridge
-  ctx.fillStyle = '#0a0a0a';
-  ctx.beginPath(); ctx.ellipse(cx, gy - 102, 16, 5, 0, Math.PI, 0); ctx.fill();
-
-  // ── Gray snout / muzzle ──
-  ctx.fillStyle = SNOUT;
-  ctx.beginPath(); ctx.ellipse(cx, gy - 88, 11, 9, 0, 0, Math.PI*2); ctx.fill();
-  // Nostrils
-  ctx.fillStyle = '#444';
-  ctx.beginPath(); ctx.ellipse(cx - 4, gy - 91, 2.5, 2, 0, 0, Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(cx + 4, gy - 91, 2.5, 2, 0, 0, Math.PI*2); ctx.fill();
-
-  // ── Eyes — angry red with black pupils ──
-  ctx.fillStyle = '#FF2200';
-  ctx.beginPath(); ctx.arc(cx - 8, gy - 98, 4, 0, Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.arc(cx + 8, gy - 98, 4, 0, Math.PI*2); ctx.fill();
-  ctx.fillStyle = '#000';
-  ctx.beginPath(); ctx.arc(cx - 8, gy - 98, 2, 0, Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.arc(cx + 8, gy - 98, 2, 0, Math.PI*2); ctx.fill();
-
-  // ── Mouth — bared teeth on snout ──
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(cx - 8, gy - 83, 16, 5);
-  ctx.strokeStyle = '#333'; ctx.lineWidth = 1;
-  for (let i = 1; i < 5; i++) {
-    ctx.beginPath();
-    ctx.moveTo(cx - 8 + i * 4, gy - 83);
-    ctx.lineTo(cx - 8 + i * 4, gy - 78);
-    ctx.stroke();
-  }
 
   ctx.restore();
 }
@@ -1725,23 +1604,6 @@ function stopMusic() {
     audioCtx.close();
     audioCtx = null;
   }
-}
-
-function playGrunt() {
-  const ac  = getAudioCtx();
-  const now = ac.currentTime;
-  [[80, 0.35],[160, 0.12]].forEach(([freq, vol]) => {
-    const osc  = ac.createOscillator();
-    const gain = ac.createGain();
-    osc.connect(gain); gain.connect(ac.destination);
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(freq,        now);
-    osc.frequency.linearRampToValueAtTime(freq * 1.3, now + 0.08);
-    osc.frequency.linearRampToValueAtTime(freq * 0.6, now + 0.4);
-    gain.gain.setValueAtTime(vol,  now);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.45);
-    osc.start(now); osc.stop(now + 0.5);
-  });
 }
 
 function playQuack() {
