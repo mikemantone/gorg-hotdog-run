@@ -159,6 +159,9 @@ let particles   = [];
 let clouds      = [];
 let bgTrees     = [];
 
+// Tube colour palette – vivid, none close to the pool blue/cyan water
+const TUBE_COLORS = ['#FF5252', '#FF9800', '#FFD600', '#E040FB', '#76FF03'];
+
 // Obstacle types: pool obstacles + flying ostrich
 const POOL_OBSTACLE_TYPES    = ['tube','noodle','tallNoodle','twinNoodle','bigTube','ball','lounger'];
 const FLYING_OBSTACLE_TYPES  = ['ostrich'];
@@ -177,12 +180,13 @@ function spawnObstacle() {
     t = OBSTACLE_TYPES[Math.floor(Math.random() * OBSTACLE_TYPES.length)];
   } while (t === lastObstacleType);
   lastObstacleType = t;
-  let w, h, gy, flying = false;
+  let w, h, gy, flying = false, color = null;
   switch(t) {
     // h = how far above the waterline the pool obstacle protrudes.
     case 'tube': {
       const tubeDepths = [GROUND_Y, GROUND_Y + 14, GROUND_Y + 28];
       gy = tubeDepths[Math.floor(Math.random() * tubeDepths.length)];
+      color = TUBE_COLORS[Math.floor(Math.random() * TUBE_COLORS.length)];
       w = 62; h = 0; break;
     }
     case 'noodle':    w=26;  h=26; gy=GROUND_Y; break;
@@ -191,6 +195,7 @@ function spawnObstacle() {
     case 'bigTube': {
       const bigTubeDepths = [GROUND_Y, GROUND_Y + 14, GROUND_Y + 28];
       gy = bigTubeDepths[Math.floor(Math.random() * bigTubeDepths.length)];
+      color = TUBE_COLORS[Math.floor(Math.random() * TUBE_COLORS.length)];
       w = 80; h = 0; break;
     }
     case 'ball': {
@@ -210,7 +215,7 @@ function spawnObstacle() {
       w=66; h=52; flying=true; break;
     }
   }
-  obstacles.push({ type:t, x:BASE_W+60, w, h, gy, hit:false, t:0, flying });
+  obstacles.push({ type:t, x:BASE_W+60, w, h, gy, hit:false, t:0, flying, color });
 }
 
 function spawnHotdog() {
@@ -683,10 +688,10 @@ function drawObstacle(o) {
   ctx.save();
   switch(o.type) {
     case 'tube':
-      drawInnerTube(o.x, o.gy, o.w, o.h, o.t, 28, '#FF5722', '#FFEB3B');
+      drawInnerTube(o.x, o.gy, o.w, o.h, o.t, 28, o.color || '#FF5252');
       break;
     case 'bigTube':
-      drawInnerTube(o.x, o.gy, o.w, o.h, o.t, 37, '#E91E63', '#00BCD4');
+      drawInnerTube(o.x, o.gy, o.w, o.h, o.t, 37, o.color || '#FF5252');
       break;
     case 'noodle':
       drawWigglyNoodle(o.x, o.gy, o.w, o.h, '#FF9800', o.t);
@@ -714,7 +719,7 @@ function drawObstacle(o) {
 }
 
 // Inflatable inner tube – sits in the pool water (center below waterline)
-function drawInnerTube(x, gy, w, h, t, outerR, color1, color2) {
+function drawInnerTube(x, gy, w, h, t, outerR, color) {
   const cx     = x + w / 2;
   const cy     = gy + outerR * 0.55;   // center submerged; top of ring at ~gy
   const innerR = outerR * 0.46;
@@ -724,18 +729,12 @@ function drawInnerTube(x, gy, w, h, t, outerR, color1, color2) {
   ctx.translate(cx, cy);
   ctx.rotate(tilt);
 
-  // Four alternating stripe segments forming the donut
-  const colors = [color1, color2, color1, color2];
-  for(let i = 0; i < 4; i++) {
-    const a1 = (i / 4) * Math.PI * 2 - Math.PI / 2;
-    const a2 = ((i + 1) / 4) * Math.PI * 2 - Math.PI / 2;
-    ctx.beginPath();
-    ctx.arc(0, 0, outerR, a1, a2, false);
-    ctx.arc(0, 0, innerR, a2, a1, true);
-    ctx.closePath();
-    ctx.fillStyle = colors[i];
-    ctx.fill();
-  }
+  // Solid donut shape using evenodd fill rule
+  ctx.beginPath();
+  ctx.arc(0, 0, outerR, 0, Math.PI * 2, false);
+  ctx.arc(0, 0, innerR, 0, Math.PI * 2, true);
+  ctx.fillStyle = color;
+  ctx.fill('evenodd');
 
   // Outer and inner ring outlines
   ctx.strokeStyle = 'rgba(0,0,0,0.22)';
@@ -750,7 +749,6 @@ function drawInnerTube(x, gy, w, h, t, outerR, color1, color2) {
   ctx.fill();
 
   ctx.restore();
-
 }
 
 // Pool noodle – full-length wiggle from pool floor to tip, no muted underwater section
