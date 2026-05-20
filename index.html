@@ -15,16 +15,58 @@
       height: 100vh;
       font-family: 'Arial Black', Arial, sans-serif;
     }
+    #game-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
     canvas {
       display: block;
       touch-action: none;
-      cursor: pointer;
       image-rendering: pixelated;
+    }
+    #jump-area {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 10px 0 8px;
+      width: 100%;
+      background: rgba(0, 25, 55, 0.82);
+      border-top: 2px solid rgba(80, 170, 230, 0.3);
+    }
+    #jump-btn {
+      width: clamp(180px, 36vw, 280px);
+      height: 56px;
+      background: linear-gradient(to bottom, #FF8C42 0%, #e84400 100%);
+      color: #fff;
+      font-size: clamp(16px, 3.2vw, 21px);
+      font-weight: 900;
+      font-family: 'Arial Black', Arial, sans-serif;
+      border: none;
+      border-radius: 28px;
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+      box-shadow: 0 5px 0 #7a2000, 0 0 24px rgba(255,100,0,0.4);
+      letter-spacing: 1px;
+      outline: none;
+      transition: transform 0.06s, box-shadow 0.06s, background 0.06s;
+    }
+    #jump-btn.held {
+      transform: translateY(4px);
+      box-shadow: 0 1px 0 #7a2000, 0 0 10px rgba(255,100,0,0.25);
+      background: linear-gradient(to bottom, #d06020 0%, #b03000 100%);
     }
   </style>
 </head>
 <body>
-<canvas id="c"></canvas>
+<div id="game-wrap">
+  <canvas id="c"></canvas>
+  <div id="jump-area">
+    <button id="jump-btn">JUMP 🌊</button>
+  </div>
+</div>
 <script>
 // ─── CANVAS SETUP ──────────────────────────────────────────────────────────────
 const canvas = document.getElementById('c');
@@ -33,9 +75,11 @@ const ctx    = canvas.getContext('2d');
 const BASE_W = 800;
 const BASE_H = 450;
 
+const BTN_H = 78; // jump button area height in CSS pixels
+
 function resize() {
   const scaleX = window.innerWidth  / BASE_W;
-  const scaleY = window.innerHeight / BASE_H;
+  const scaleY = (window.innerHeight - BTN_H) / BASE_H;
   const scale  = Math.min(scaleX, scaleY);
   canvas.width  = BASE_W;
   canvas.height = BASE_H;
@@ -48,13 +92,13 @@ window.addEventListener('resize', resize);
 // ─── CONSTANTS ─────────────────────────────────────────────────────────────────
 const GROUND_Y   = BASE_H - 80;
 const GRAVITY    = 0.55;
-const JUMP_MIN   = -9;
-const JUMP_MAX   = -15;
-const HOLD_MAX   = 400;          // ms to reach max jump
+const JUMP_MIN   = -10;          // base jump on press
+const JUMP_MAX   = -15;          // not used for charge; kept for boost ceiling
+const HOLD_MAX   = 500;          // ms of gravity-reduced boost while holding
 const PLAYER_X   = 130;
 const INIT_SPEED = 4.5;
 const MAX_SPEED  = 12;
-const ACCEL      = 0.0008;       // speed units per ms
+const ACCEL      = 0.000157;     // ~30% slower than previous (was 0.00032)
 
 // ─── COLOURS ───────────────────────────────────────────────────────────────────
 const C = {
@@ -114,26 +158,57 @@ let particles   = [];
 let clouds      = [];
 let bgTrees     = [];
 
-// Obstacle types: chair, ball, noodle, flamingo, doubleNoodle
-const OBSTACLE_TYPES = ['chair','ball','noodle','flamingo','doubleNoodle'];
+// Obstacle types: pool obstacles + flying ostrich
+const POOL_OBSTACLE_TYPES    = ['tube','noodle','tallNoodle','twinNoodle','bigTube','ball','lounger'];
+const FLYING_OBSTACLE_TYPES  = ['ostrich'];
+// Mix: 1 flying per ~5 pool obstacles
+const OBSTACLE_TYPES = [
+  ...POOL_OBSTACLE_TYPES,
+  ...POOL_OBSTACLE_TYPES,
+  ...POOL_OBSTACLE_TYPES,
+  ...POOL_OBSTACLE_TYPES,
+  ...FLYING_OBSTACLE_TYPES,
+];
 
 function spawnObstacle() {
-  const t     = OBSTACLE_TYPES[Math.floor(Math.random() * OBSTACLE_TYPES.length)];
-  let w, h, gy;
+  const t = OBSTACLE_TYPES[Math.floor(Math.random() * OBSTACLE_TYPES.length)];
+  let w, h, gy, flying = false;
   switch(t) {
-    case 'chair':       w=42; h=52; gy=GROUND_Y; break;
-    case 'ball':        w=38; h=38; gy=GROUND_Y; break;
-    case 'noodle':      w=16; h=70; gy=GROUND_Y; break;
-    case 'flamingo':    w=34; h=64; gy=GROUND_Y; break;
-    case 'doubleNoodle':w=16; h=48; gy=GROUND_Y; break;
+    // h = how far above the waterline the pool obstacle protrudes.
+    case 'tube':      w=62;  h=0;  gy=GROUND_Y; break;
+    case 'noodle':    w=26;  h=26; gy=GROUND_Y; break;
+    case 'tallNoodle':w=26;  h=58; gy=GROUND_Y; break;
+    case 'twinNoodle':w=64;  h=36; gy=GROUND_Y; break;
+    case 'bigTube':   w=80;  h=0;  gy=GROUND_Y; break;
+    case 'ball':      w=44;  h=0;  gy=GROUND_Y; break;
+    case 'lounger':   w=112; h=0;  gy=GROUND_Y; break;
+    case 'ostrich': {
+      // Flies at one of three sky heights — threatens Gørg while airborne
+      const skyHeights = [GROUND_Y - 72, GROUND_Y - 112, GROUND_Y - 158];
+      gy = skyHeights[Math.floor(Math.random() * skyHeights.length)];
+      w=66; h=52; flying=true; break;
+    }
   }
-  obstacles.push({ type:t, x:BASE_W+20, w, h, gy, hit:false });
+  obstacles.push({ type:t, x:BASE_W+60, w, h, gy, hit:false, t:0, flying });
 }
 
 function spawnHotdog() {
-  const heights = [GROUND_Y - 10, GROUND_Y - 40, GROUND_Y - 80, GROUND_Y - 120];
-  const yy = heights[Math.floor(Math.random() * heights.length)];
-  hotdogItems.push({ x:BASE_W+20, y:yy, collected:false, bobOffset: Math.random()*Math.PI*2, floatT:0 });
+  // Heights above water (need jump) and inside pool (collected by running)
+  const heights = [
+    GROUND_Y - 120, GROUND_Y - 80, GROUND_Y - 40, GROUND_Y - 10,
+    GROUND_Y + 14, GROUND_Y + 30,
+  ];
+  // Spawn 3 hotdogs per call in a loose cluster (tripled density)
+  for(let i = 0; i < 3; i++) {
+    const yy = heights[Math.floor(Math.random() * heights.length)];
+    hotdogItems.push({
+      x: BASE_W + 20 + i * 58,
+      y: yy,
+      collected: false,
+      bobOffset: Math.random() * Math.PI * 2,
+      floatT: 0,
+    });
+  }
 }
 
 function spawnCloud() {
@@ -167,34 +242,41 @@ function onDown(e) {
   if (state === 'start') { startGame(); return; }
   if (state === 'dead')  { startGame(); return; }
   if (state === 'playing') {
-    holdStart  = performance.now();
-    isHolding  = true;
+    holdStart = performance.now();
+    isHolding = true;
+    doJump();   // jump starts immediately on press
   }
 }
 
 function onUp(e) {
   e.preventDefault();
-  if (state !== 'playing' || !isHolding) return;
-  const held = performance.now() - holdStart;
-  isHolding  = false;
-  doJump(held);
+  isHolding = false;   // releasing ends the gravity-boost phase
 }
 
-canvas.addEventListener('mousedown',  onDown, {passive:false});
-canvas.addEventListener('mouseup',    onUp,   {passive:false});
-canvas.addEventListener('touchstart', onDown, {passive:false});
-canvas.addEventListener('touchend',   onUp,   {passive:false});
+// Canvas: advance start/dead states only — never triggers a jump during play
+canvas.addEventListener('mousedown',  e => { e.preventDefault(); if (state !== 'playing') onDown(e); }, {passive:false});
+canvas.addEventListener('touchstart', e => { e.preventDefault(); if (state !== 'playing') onDown(e); }, {passive:false});
+
+// Keyboard: full control (desktop)
 document.addEventListener('keydown', e => { if(e.code==='Space'||e.code==='ArrowUp') { e.preventDefault(); onDown(e); } });
 document.addEventListener('keyup',   e => { if(e.code==='Space'||e.code==='ArrowUp') { e.preventDefault(); onUp(e);   } });
 
-function doJump(heldMs) {
+// Jump button: dedicated jump control (tap = small jump, hold = big jump)
+const jumpBtn = document.getElementById('jump-btn');
+function btnDown(e) { e.preventDefault(); jumpBtn.classList.add('held');    onDown(e); }
+function btnUp(e)   { e.preventDefault(); jumpBtn.classList.remove('held'); onUp(e);   }
+jumpBtn.addEventListener('mousedown',   btnDown, {passive:false});
+jumpBtn.addEventListener('mouseup',     btnUp,   {passive:false});
+jumpBtn.addEventListener('mouseleave',  btnUp,   {passive:false});
+jumpBtn.addEventListener('touchstart',  btnDown, {passive:false});
+jumpBtn.addEventListener('touchend',    btnUp,   {passive:false});
+jumpBtn.addEventListener('touchcancel', btnUp,   {passive:false});
+
+function doJump() {
   if (!player.onGround) return;
-  const t  = Math.min(heldMs, HOLD_MAX) / HOLD_MAX;
-  const vy = JUMP_MIN + (JUMP_MAX - JUMP_MIN) * t;
-  player.vy        = vy;
-  player.onGround  = false;
-  player.squish    = 0.65 + 0.35*(1-t);  // more squish on big jump charge
-  player.jumpDust  = true;
+  player.vy       = JUMP_MIN;   // base launch velocity — always the same
+  player.onGround = false;
+  player.squish   = 0.75;
   spawnJumpParticles();
 }
 
@@ -293,7 +375,13 @@ function playerRect() {
 }
 
 function obstacleRect(o) {
-  return { x: o.x, y: o.gy - o.h, w: o.w, h: o.h };
+  if (o.flying) {
+    // Sky obstacle – centered at gy, only threatens Gørg while airborne
+    return { x: o.x + 10, y: o.gy - 26, w: o.w - 20, h: 52 };
+  }
+  // Pool obstacle – top at (gy - h), extends 65px into the water
+  const top = o.gy - o.h;
+  return { x: o.x, y: top, w: o.w, h: (o.gy + 65) - top };
 }
 
 function rectsOverlap(a, b) {
@@ -335,14 +423,18 @@ function update(dt) {
 
   // Player physics
   if (!player.onGround) {
-    player.vy     += GRAVITY;
+    // While the button is held AND still ascending AND within boost window,
+    // gravity is heavily reduced — this lets a longer hold produce a higher arc.
+    const heldSoFar = isHolding ? (performance.now() - holdStart) : HOLD_MAX + 1;
+    const boosting  = isHolding && player.vy < 0 && heldSoFar < HOLD_MAX;
+    player.vy     += boosting ? GRAVITY * 0.28 : GRAVITY;
     player.y      += player.vy;
     player.squish += (1 - player.squish) * 0.2;
     if (player.y >= GROUND_Y) {
       player.y        = GROUND_Y;
       player.vy       = 0;
       player.onGround = true;
-      player.squish   = 1.3;        // squash on landing
+      player.squish   = 1.3;
       spawnJumpParticles();
     }
   } else {
@@ -364,6 +456,7 @@ function update(dt) {
   for(let i=obstacles.length-1; i>=0; i--) {
     const o = obstacles[i];
     o.x -= speed;
+    o.t  += dt;
     if (o.x + o.w < -20) { obstacles.splice(i,1); continue; }
     if (!o.hit && rectsOverlap(playerRect(), obstacleRect(o))) {
       killPlayer();
@@ -377,7 +470,7 @@ function update(dt) {
     h.floatT += dt;
     if (h.x + 30 < -20) { hotdogItems.splice(i,1); continue; }
     if (!h.collected) {
-      const hr = { x:h.x-14, y:h.y-10, w:28, h:20 };
+      const hr = { x:h.x-17, y:h.y-12, w:34, h:24 }; // 20% larger hitbox
       if (rectsOverlap(playerRect(), hr)) {
         h.collected = true;
         hotdogs++;
@@ -568,130 +661,380 @@ function drawPalmTree(x,y,size,alpha) {
 
 // ─── DRAW OBSTACLES ────────────────────────────────────────────────────────────
 function drawObstacle(o) {
-  const x = o.x, bot = o.gy;
   ctx.save();
   switch(o.type) {
-    case 'chair':      drawChair(x, bot, o.w, o.h);     break;
-    case 'ball':       drawBeachBall(x, bot, o.w);       break;
-    case 'noodle':     drawNoodle(x, bot, o.w, o.h, '#FF7043'); break;
-    case 'flamingo':   drawFlamingo(x, bot, o.w, o.h);  break;
-    case 'doubleNoodle':
-      drawNoodle(x,          bot, o.w, o.h, '#FF7043');
-      drawNoodle(x+o.w+14,   bot, o.w, o.h*0.75, '#AB47BC');
+    case 'tube':
+      drawInnerTube(o.x, o.gy, o.w, o.h, o.t, 28, '#FF5722', '#FFEB3B');
+      break;
+    case 'bigTube':
+      drawInnerTube(o.x, o.gy, o.w, o.h, o.t, 37, '#E91E63', '#00BCD4');
+      break;
+    case 'noodle':
+      drawWigglyNoodle(o.x, o.gy, o.w, o.h, '#FF9800', o.t);
+      break;
+    case 'tallNoodle':
+      drawWigglyNoodle(o.x, o.gy, o.w, o.h, '#8BC34A', o.t);
+      break;
+    case 'twinNoodle': {
+      const nw = 24;
+      drawWigglyNoodle(o.x,        o.gy, nw, o.h,        '#FF4081', o.t);
+      drawWigglyNoodle(o.x+nw+16,  o.gy, nw, o.h * 0.8,  '#29B6F6', o.t + 600);
+      break;
+    }
+    case 'ball':
+      drawBeachBall(o.x, o.gy, o.w, o.h, o.t);
+      break;
+    case 'lounger':
+      drawPoolLounger(o.x, o.gy, o.w, o.t);
+      break;
+    case 'ostrich':
+      drawOstrich(o.x, o.gy, o.w, o.t);
       break;
   }
   ctx.restore();
 }
 
-function drawChair(x, bot, w, h) {
-  // legs
-  ctx.fillStyle = '#F9A825';
-  ctx.fillRect(x+3,  bot-h+10, 6, h-10);
-  ctx.fillRect(x+w-9,bot-h+10, 6, h-10);
-  // seat
-  ctx.fillStyle = '#FFCC02';
-  roundRect(x, bot-h+6, w, h*0.25, 4);
-  ctx.fill();
-  // back
-  ctx.fillStyle = '#FFCC02';
-  roundRect(x, bot-h, w, h*0.35, 4);
-  ctx.fill();
-  // stripes
-  ctx.strokeStyle = '#E65100';
-  ctx.lineWidth   = 2.5;
-  for(let i=0;i<3;i++) {
+// Inflatable inner tube – sits in the pool water (center below waterline)
+function drawInnerTube(x, gy, w, h, t, outerR, color1, color2) {
+  const cx     = x + w / 2;
+  const cy     = gy + outerR * 0.55;   // center submerged; top of ring at ~gy
+  const innerR = outerR * 0.46;
+  const tilt   = Math.sin(t * 0.0018) * 0.18;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(tilt);
+
+  // Four alternating stripe segments forming the donut
+  const colors = [color1, color2, color1, color2];
+  for(let i = 0; i < 4; i++) {
+    const a1 = (i / 4) * Math.PI * 2 - Math.PI / 2;
+    const a2 = ((i + 1) / 4) * Math.PI * 2 - Math.PI / 2;
     ctx.beginPath();
-    ctx.moveTo(x+6+i*((w-12)/2), bot-h);
-    ctx.lineTo(x+6+i*((w-12)/2), bot-h+h*0.35);
+    ctx.arc(0, 0, outerR, a1, a2, false);
+    ctx.arc(0, 0, innerR, a2, a1, true);
+    ctx.closePath();
+    ctx.fillStyle = colors[i];
+    ctx.fill();
+  }
+
+  // Outer and inner ring outlines
+  ctx.strokeStyle = 'rgba(0,0,0,0.22)';
+  ctx.lineWidth   = 1.5;
+  ctx.beginPath(); ctx.arc(0, 0, outerR, 0, Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(0, 0, innerR, 0, Math.PI*2); ctx.stroke();
+
+  // Shine highlight on upper-left
+  ctx.fillStyle = 'rgba(255,255,255,0.45)';
+  ctx.beginPath();
+  ctx.arc(-outerR * 0.28, -outerR * 0.35, outerR * 0.2, 0, Math.PI*2);
+  ctx.fill();
+
+  ctx.restore();
+
+}
+
+// Pool noodle – full-length wiggle from pool floor to tip, no muted underwater section
+function drawWigglyNoodle(x, gy, w, h, color, t) {
+  const cx     = x + w / 2;
+  const topY   = gy - h;
+  const baseY  = BASE_H - 8;
+  const totalH = baseY - topY;
+
+  // Three independent sine waves give the noodle a fluid, continuous wiggle
+  const wigA = Math.sin(t * 0.003)        * 12;
+  const wigB = Math.sin(t * 0.003 + 1.1)  * 7;
+  const wigC = Math.sin(t * 0.003 + 2.2)  * 4;
+
+  // Control points distributed evenly along the full height
+  const cp1x = cx + wigC;            const cp1y = baseY  - totalH * 0.25;
+  const cp2x = cx + wigB;            const cp2y = baseY  - totalH * 0.55;
+  const cp3x = cx + wigA * 0.7;     const cp3y = baseY  - totalH * 0.78;
+  const tipX  = cx + wigA;           const tipY  = topY;
+
+  ctx.save();
+
+  // ── Main noodle body – single gradient stroke all the way through ──
+  ctx.lineWidth   = w;
+  ctx.lineCap     = 'round';
+  ctx.lineJoin    = 'round';
+  ctx.strokeStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(cx, baseY);
+  // Two chained cubic beziers for a nice S-curve wiggle
+  ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, cx + wigB * 0.5, baseY - totalH * 0.5);
+  ctx.bezierCurveTo(cp3x, cp3y, tipX, tipY - 10, tipX, tipY);
+  ctx.stroke();
+
+  // ── Highlight stripe along full length ──
+  ctx.strokeStyle = 'rgba(255,255,255,0.36)';
+  ctx.lineWidth   = w * 0.27;
+  ctx.beginPath();
+  ctx.moveTo(cx - w * 0.17, baseY);
+  ctx.bezierCurveTo(
+    cp1x - w*0.17, cp1y,
+    cp2x - w*0.17, cp2y,
+    cx + wigB*0.5 - w*0.17, baseY - totalH*0.5
+  );
+  ctx.bezierCurveTo(
+    cp3x - w*0.17, cp3y,
+    tipX - w*0.17, tipY-10,
+    tipX - w*0.17, tipY
+  );
+  ctx.stroke();
+
+  // ── Rounded top cap ──
+  ctx.fillStyle = shadeColor(color, 22);
+  ctx.beginPath();
+  ctx.arc(tipX, tipY, w / 2, 0, Math.PI*2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+// Beach ball – sits in the pool water, top peeking just at the waterline
+function drawBeachBall(x, bot, w, h, t) {
+  const r   = w / 2;
+  const cx  = x + r;
+  const bob = Math.sin(t * 0.002) * 3;
+  const cy  = bot + r * 0.45 + bob;  // center below waterline, top ring visible
+
+  ctx.save();
+
+  // Ball segments (6 coloured wedges)
+  const ballColors = ['#E91E63','#FFEB3B','#2196F3','#E91E63','#FFEB3B','#2196F3'];
+  for(let i = 0; i < 6; i++) {
+    const a1 = (i / 6) * Math.PI * 2;
+    const a2 = ((i + 1) / 6) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, a1, a2);
+    ctx.closePath();
+    ctx.fillStyle = ballColors[i];
+    ctx.fill();
+  }
+
+  // White seam lines between segments
+  ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+  ctx.lineWidth   = 1;
+  for(let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
     ctx.stroke();
   }
-}
 
-function drawBeachBall(x, bot, w) {
-  const cx = x+w/2, cy = bot-w/2, r = w/2;
-  ctx.save();
-  ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2);
-  ctx.fillStyle = '#fff'; ctx.fill();
-  // segments
-  const colors = ['#E91E63','#FFEB3B','#2196F3','#4CAF50'];
-  for(let i=0;i<4;i++) {
-    const a1 = (i/4)*Math.PI*2, a2=((i+1)/4)*Math.PI*2;
-    ctx.beginPath();
-    ctx.moveTo(cx,cy);
-    ctx.arc(cx,cy,r,a1,a2);
-    ctx.closePath();
-    ctx.fillStyle = colors[i]; ctx.fill();
-  }
-  // shine
+  // Shine
+  ctx.fillStyle = 'rgba(255,255,255,0.38)';
   ctx.beginPath();
-  ctx.arc(cx-r*0.25, cy-r*0.25, r*0.28, 0, Math.PI*2);
-  ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.fill();
+  ctx.arc(cx - r * 0.28, cy - r * 0.3, r * 0.25, 0, Math.PI*2);
+  ctx.fill();
+
   ctx.restore();
 }
 
-function drawNoodle(x, bot, w, h, color) {
+// Inflatable pool lounger – wide floatie resting on the water surface
+function drawPoolLounger(x, gy, w, t) {
+  const bob = Math.sin(t * 0.0014) * 2.5;
+  const y   = gy + bob;
+
   ctx.save();
-  // shadow
-  ctx.fillStyle = 'rgba(0,0,0,0.15)';
-  ctx.beginPath();
-  ctx.ellipse(x+w/2, bot+3, w, 5, 0, 0, Math.PI*2);
+
+  // ── Main body ──
+  const bodyGrad = ctx.createLinearGradient(x, y - 18, x, y + 10);
+  bodyGrad.addColorStop(0, '#4DD0E1');
+  bodyGrad.addColorStop(0.5, '#00ACC1');
+  bodyGrad.addColorStop(1, '#00838F');
+  ctx.fillStyle = bodyGrad;
+  roundRect(x + 6, y - 16, w - 12, 22, 9);
   ctx.fill();
-  // noodle body
-  roundRect(x, bot-h, w, h, w/2);
-  const grad = ctx.createLinearGradient(x,0,x+w,0);
-  grad.addColorStop(0,'#fff4');
-  grad.addColorStop(0.4, color);
-  grad.addColorStop(1, shadeColor(color,-30));
-  ctx.fillStyle = grad; ctx.fill();
-  // stripe
-  ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+
+  // White diagonal stripes
+  ctx.save();
+  ctx.beginPath();
+  roundRect(x + 6, y - 16, w - 12, 22, 9);
+  ctx.clip();
+  ctx.strokeStyle = 'rgba(255,255,255,0.32)';
+  ctx.lineWidth   = 7;
+  for(let i = 0; i < 8; i++) {
+    const sx = x + i * 18 - 10;
+    ctx.beginPath();
+    ctx.moveTo(sx,        y - 16);
+    ctx.lineTo(sx + 22,   y + 6);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Outer rim stroke
+  ctx.strokeStyle = '#006064';
+  ctx.lineWidth   = 2.5;
+  roundRect(x + 6, y - 16, w - 12, 22, 9);
+  ctx.stroke();
+
+  // ── Headrest bump (right end) ──
+  const hGrad = ctx.createRadialGradient(x+w-18, y-22, 2, x+w-18, y-20, 16);
+  hGrad.addColorStop(0, '#80DEEA');
+  hGrad.addColorStop(1, '#00ACC1');
+  ctx.fillStyle = hGrad;
+  ctx.beginPath();
+  ctx.ellipse(x + w - 18, y - 21, 16, 11, 0, 0, Math.PI*2);
+  ctx.fill();
+  ctx.strokeStyle = '#006064';
   ctx.lineWidth   = 2;
   ctx.beginPath();
-  ctx.moveTo(x+w*0.3, bot-h+4);
-  ctx.lineTo(x+w*0.3, bot-4);
+  ctx.ellipse(x + w - 18, y - 21, 16, 11, 0, 0, Math.PI*2);
   ctx.stroke();
+
+  // ── Armrest bumps ──
+  [x + w*0.28, x + w*0.68].forEach(ax => {
+    ctx.fillStyle = '#00BCD4';
+    ctx.beginPath();
+    ctx.ellipse(ax, y - 19, 12, 7, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle = '#006064';
+    ctx.lineWidth   = 1.5;
+    ctx.beginPath();
+    ctx.ellipse(ax, y - 19, 12, 7, 0, 0, Math.PI*2);
+    ctx.stroke();
+  });
+
+  // ── Cup holder detail ──
+  ctx.fillStyle = '#006064';
+  ctx.beginPath();
+  ctx.arc(x + 28, y - 7, 5, 0, Math.PI*2);
+  ctx.fill();
+  ctx.fillStyle = '#80DEEA';
+  ctx.beginPath();
+  ctx.arc(x + 28, y - 7, 3, 0, Math.PI*2);
+  ctx.fill();
+
   ctx.restore();
 }
 
-function drawFlamingo(x, bot, w, h) {
+// Ostrich – tiny-winged sky menace, threatens Gørg while airborne
+function drawOstrich(x, gy, w, t) {
+  const cx       = x + w / 2;
+  const cy       = gy;
+  const wingFlap = Math.sin(t * 0.013) * 32;   // frantic small-wing flap
+  const legSwing = Math.sin(t * 0.009) * 22;
+
   ctx.save();
-  const cx = x + w/2;
-  // body
-  ctx.fillStyle = '#EC407A';
+
+  // ── Poofy tail feathers ──
+  for(let i = 0; i < 6; i++) {
+    const fa    = (-50 + i * 20) * Math.PI / 180;
+    const even  = i % 2 === 0;
+    ctx.strokeStyle = even ? '#5D4037' : '#ECEFF1';
+    ctx.lineWidth   = even ? 5 : 3;
+    ctx.lineCap     = 'round';
+    ctx.beginPath();
+    ctx.moveTo(cx - w*0.27, cy + 4);
+    ctx.lineTo(
+      cx - w*0.27 + Math.cos(fa + Math.PI) * 20,
+      cy + 4     + Math.sin(fa + Math.PI) * 20
+    );
+    ctx.stroke();
+  }
+
+  // ── Body ──
+  const bodyGrad = ctx.createRadialGradient(cx+4, cy-6, 3, cx, cy, w*0.3);
+  bodyGrad.addColorStop(0, '#6D4C41');
+  bodyGrad.addColorStop(1, '#1a0800');
+  ctx.fillStyle = bodyGrad;
   ctx.beginPath();
-  ctx.ellipse(cx, bot-h*0.5, w*0.45, h*0.3, -0.2, 0, Math.PI*2);
+  ctx.ellipse(cx, cy, w*0.3, w*0.27, 0, 0, Math.PI*2);
   ctx.fill();
-  // neck
-  ctx.strokeStyle = '#EC407A';
-  ctx.lineWidth   = 7;
+
+  // White belly
+  ctx.fillStyle = 'rgba(240,235,220,0.38)';
+  ctx.beginPath();
+  ctx.ellipse(cx + 5, cy + 7, w*0.14, w*0.13, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // ── Tiny left wing ──
+  ctx.save();
+  ctx.translate(cx - w*0.16, cy - 3);
+  ctx.rotate((-22 + wingFlap) * Math.PI / 180);
+  ctx.fillStyle = '#4E342E';
+  ctx.beginPath();
+  ctx.ellipse(0, -13, 7, 15, 0.15, 0, Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+
+  // ── Tiny right wing ──
+  ctx.save();
+  ctx.translate(cx + w*0.1, cy - 3);
+  ctx.rotate((22 - wingFlap) * Math.PI / 180);
+  ctx.fillStyle = '#4E342E';
+  ctx.beginPath();
+  ctx.ellipse(0, -13, 7, 15, -0.15, 0, Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+
+  // ── Long neck ──
+  ctx.strokeStyle = '#FF8A65';
+  ctx.lineWidth   = 9;
   ctx.lineCap     = 'round';
   ctx.beginPath();
-  ctx.moveTo(cx+w*0.15, bot-h*0.65);
-  ctx.bezierCurveTo(cx+w*0.4, bot-h*0.85, cx+w*0.3, bot-h*0.95, cx+w*0.1, bot-h+4);
+  ctx.moveTo(cx + w*0.12, cy - w*0.18);
+  ctx.bezierCurveTo(
+    cx + w*0.2,  cy - w*0.38,
+    cx + w*0.24, cy - w*0.52,
+    cx + w*0.19, cy - w*0.63
+  );
   ctx.stroke();
-  // head
-  ctx.fillStyle = '#EC407A';
-  ctx.beginPath(); ctx.arc(cx+w*0.1, bot-h+4, 7, 0, Math.PI*2); ctx.fill();
-  // beak
+
+  // ── Head ──
+  ctx.fillStyle = '#FF8A65';
+  ctx.beginPath();
+  ctx.arc(cx + w*0.18, cy - w*0.69, 10, 0, Math.PI*2);
+  ctx.fill();
+
+  // Big cartoon eye
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.arc(cx + w*0.21, cy - w*0.71, 5, 0, Math.PI*2);
+  ctx.fill();
+  ctx.fillStyle = '#222';
+  ctx.beginPath();
+  ctx.arc(cx + w*0.22, cy - w*0.71, 2.8, 0, Math.PI*2);
+  ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.arc(cx + w*0.225, cy - w*0.715, 1, 0, Math.PI*2);
+  ctx.fill();
+
+  // Beak
   ctx.fillStyle = '#FFB300';
   ctx.beginPath();
-  ctx.moveTo(cx+w*0.1+5, bot-h+4);
-  ctx.lineTo(cx+w*0.1+14, bot-h+8);
-  ctx.lineTo(cx+w*0.1+5, bot-h+9);
-  ctx.closePath(); ctx.fill();
-  // eye
-  ctx.fillStyle = '#333';
-  ctx.beginPath(); ctx.arc(cx+w*0.1+3, bot-h+2, 2, 0, Math.PI*2); ctx.fill();
-  // legs
-  ctx.strokeStyle = '#EC407A';
+  ctx.moveTo(cx + w*0.26, cy - w*0.67);
+  ctx.lineTo(cx + w*0.38, cy - w*0.65);
+  ctx.lineTo(cx + w*0.26, cy - w*0.63);
+  ctx.closePath();
+  ctx.fill();
+
+  // ── Dangling running legs ──
+  ctx.strokeStyle = '#FF8A65';
   ctx.lineWidth   = 4;
   ctx.lineCap     = 'round';
-  ctx.beginPath(); ctx.moveTo(cx-5, bot-h*0.28); ctx.lineTo(cx-6, bot); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(cx+5, bot-h*0.28); ctx.lineTo(cx+7, bot); ctx.stroke();
-  // feet
-  ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(cx-9,bot); ctx.lineTo(cx-2,bot); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(cx+4,bot); ctx.lineTo(cx+11,bot); ctx.stroke();
+
+  // left leg
+  ctx.save();
+  ctx.translate(cx - 9, cy + w*0.22);
+  ctx.rotate(legSwing * Math.PI / 180);
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(-3, 22); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-3,22); ctx.lineTo(-9,27); ctx.stroke();
+  ctx.restore();
+
+  // right leg
+  ctx.save();
+  ctx.translate(cx + 9, cy + w*0.22);
+  ctx.rotate(-legSwing * Math.PI / 180);
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(3, 22); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(3,22); ctx.lineTo(9,27); ctx.stroke();
+  ctx.restore();
+
   ctx.restore();
 }
 
@@ -709,32 +1052,32 @@ function drawHotdog(h) {
   ctx.save();
 
   // glow
-  ctx.shadowBlur  = 14;
+  ctx.shadowBlur  = 18;
   ctx.shadowColor = '#FFD600';
 
-  // bun top
+  // bun top (20% larger: rx 16→19, ry 8→10)
   ctx.fillStyle = '#f0a500';
   ctx.beginPath();
-  ctx.ellipse(x, y-6, 16, 8, 0, Math.PI, 0);
+  ctx.ellipse(x, y-7, 19, 10, 0, Math.PI, 0);
   ctx.fill();
   // bun bottom
   ctx.fillStyle = '#c8820a';
   ctx.beginPath();
-  ctx.ellipse(x, y+4, 16, 6, 0, 0, Math.PI);
+  ctx.ellipse(x, y+5, 19, 7, 0, 0, Math.PI);
   ctx.fill();
   // sausage
   ctx.fillStyle = '#c0392b';
   ctx.beginPath();
-  ctx.ellipse(x, y-1, 14, 5, 0, 0, Math.PI*2);
+  ctx.ellipse(x, y-1, 17, 6, 0, 0, Math.PI*2);
   ctx.fill();
-  // mustard squiggle
+  // mustard squiggle (scaled 1.2×)
   ctx.strokeStyle = '#f1c40f';
-  ctx.lineWidth   = 2;
+  ctx.lineWidth   = 2.5;
   ctx.lineCap     = 'round';
   ctx.beginPath();
-  ctx.moveTo(x-9, y-3);
-  ctx.bezierCurveTo(x-5,y-7, x,y+1, x+5,y-6);
-  ctx.bezierCurveTo(x+7,y-8, x+10,y-4, x+10,y-2);
+  ctx.moveTo(x-11, y-3);
+  ctx.bezierCurveTo(x-6,y-8, x,y+1, x+6,y-7);
+  ctx.bezierCurveTo(x+8,y-10, x+12,y-5, x+12,y-2);
   ctx.stroke();
 
   ctx.restore();
@@ -919,19 +1262,24 @@ function drawHUD() {
     ctx.restore();
   }
 
-  // Hold indicator (when holding down)
-  if (isHolding && state === 'playing') {
+  // Boost bar — shows while holding and still in the boost window
+  if (isHolding && !player.onGround && state === 'playing') {
     const heldFrac = Math.min(1, (performance.now() - holdStart) / HOLD_MAX);
-    const indW = 50, indH = 8;
+    const boostLeft = 1 - heldFrac;  // bar drains as boost is used
+    const indW = 54, indH = 8;
     const ix = player.x + player.w/2 - indW/2;
-    const iy = player.y - 28;
+    const iy = player.y - 32;
     ctx.fillStyle = 'rgba(0,0,0,0.4)';
     roundRect(ix, iy, indW, indH, 4); ctx.fill();
     const iGrad = ctx.createLinearGradient(ix,0,ix+indW,0);
     iGrad.addColorStop(0,'#00e5ff');
-    iGrad.addColorStop(1,'#ff1744');
+    iGrad.addColorStop(1,'#7c4dff');
     ctx.fillStyle = iGrad;
-    roundRect(ix, iy, indW*heldFrac, indH, 4); ctx.fill();
+    roundRect(ix, iy, indW * boostLeft, indH, 4); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.font = 'bold 8px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('BOOST', ix + indW/2, iy - 2);
   }
 }
 
@@ -1065,11 +1413,12 @@ function render() {
   // Draw hotdogs
   for(const h of hotdogItems) drawHotdog(h);
 
-  // Draw obstacles
+  // Draw obstacles (emerge from pool water)
   for(const o of obstacles) drawObstacle(o);
 
   // Draw Gørg
   if (!player.isDead) drawGorg();
+
 
   // Particles
   drawParticles();
